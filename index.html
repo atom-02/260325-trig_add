@@ -1,0 +1,306 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+.app { padding: 1rem 0; color: var(--color-text-primary); }
+.layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.canvas-wrap { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: 12px; padding: 12px; }
+.panel { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: 12px; padding: 14px 16px; }
+.steps { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.step { border: 0.5px solid var(--color-border-tertiary); border-radius: 8px; padding: 10px 12px; cursor: pointer; transition: border-color .15s, background .15s; }
+.step.active { border-color: #378ADD; background: #E6F1FB; }
+.step-num { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); margin-bottom: 2px; text-transform: uppercase; letter-spacing: .05em; }
+.step.active .step-num { color: #185FA5; }
+.step-title { font-size: 13px; font-weight: 500; color: var(--color-text-primary); }
+.step-body { font-size: 12px; color: var(--color-text-secondary); margin-top: 4px; line-height: 1.5; display: none; }
+.step.active .step-body { display: block; color: #185FA5; }
+.formula-box { background: var(--color-background-primary); border: 0.5px solid var(--color-border-secondary); border-radius: 8px; padding: 10px 14px; margin-top: 8px; }
+.formula { font-family: var(--font-mono); font-size: 13px; color: var(--color-text-primary); line-height: 1.8; }
+.formula span.hi { color: #D85A30; font-weight: 500; }
+.formula span.hi2 { color: #185FA5; font-weight: 500; }
+.formula span.hi3 { color: #1D9E75; font-weight: 500; }
+.sliders { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.slider-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-text-secondary); }
+.slider-row label { min-width: 14px; font-weight: 500; }
+.slider-row input { flex: 1; }
+.slider-row .val { min-width: 44px; text-align: right; font-family: var(--font-mono); font-size: 12px; color: var(--color-text-primary); }
+.result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.result-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 8px; padding: 8px 12px; }
+.result-label { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 2px; }
+.result-val { font-family: var(--font-mono); font-size: 14px; font-weight: 500; color: var(--color-text-primary); }
+.nav { display: flex; gap: 8px; margin-top: 10px; }
+.nav button { flex: 1; padding: 7px; font-size: 13px; border-radius: 8px; border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; }
+.nav button:hover { background: var(--color-background-secondary); }
+.nav button:disabled { opacity: .35; cursor: not-allowed; }
+.highlight-eq { background: #E1F5EE; border: 0.5px solid #1D9E75; border-radius: 8px; padding: 8px 12px; margin-top: 8px; font-family: var(--font-mono); font-size: 13px; color: #085041; }
+@media (max-width: 520px) { .layout { grid-template-columns: 1fr; } }
+</style>
+<div class="app">
+  <div class="sliders">
+    <div class="slider-row">
+      <label style="color:#D85A30">α</label>
+      <input type="range" id="slA" min="0" max="90" value="50" step="1" oninput="draw()">
+      <span class="val" id="vA">50°</span>
+    </div>
+    <div class="slider-row">
+      <label style="color:#185FA5">β</label>
+      <input type="range" id="slB" min="0" max="89" value="30" step="1" oninput="draw()">
+      <span class="val" id="vB">30°</span>
+    </div>
+  </div>
+  <div class="layout">
+    <div class="canvas-wrap">
+      <canvas id="cv" width="300" height="300" style="width:100%;height:auto;display:block;"></canvas>
+    </div>
+    <div>
+      <div class="panel">
+        <div style="font-size:13px;font-weight:500;margin-bottom:8px;color:var(--color-text-primary)">유도 단계</div>
+        <div class="steps" id="steps"></div>
+        <div class="nav">
+          <button id="btnPrev" onclick="prevStep()" disabled>이전</button>
+          <button id="btnNext" onclick="nextStep()">다음</button>
+        </div>
+      </div>
+      <div class="result-grid" id="results"></div>
+    </div>
+  </div>
+  <div class="formula-box" style="margin-top:12px" id="finalBox"></div>
+</div>
+
+<script>
+const stepsData = [
+  {
+    title: "단위원 위의 점 P, Q 정의",
+    body: "단위원 위에서 각 α인 점 P와 각 β인 점 Q를 좌표로 나타냅니다.",
+    detail: "P(cos α, sin α)\nQ(cos β, sin β)\n\n∠POQ = α − β",
+    highlight: "step1"
+  },
+  {
+    title: "코사인 법칙으로 PQ² 계산",
+    body: "삼각형 POQ에서 코사인 법칙을 적용합니다. |OP|=|OQ|=1이므로",
+    detail: "PQ² = OP² + OQ² − 2·OP·OQ·cos(α−β)\n    = 1 + 1 − 2cos(α−β)\n    = 2 − 2cos(α−β)",
+    highlight: "step2"
+  },
+  {
+    title: "좌표로 PQ² 직접 계산",
+    body: "두 점의 좌표를 이용해 PQ²를 직접 전개합니다.",
+    detail: "PQ² = (cosα−cosβ)² + (sinα−sinβ)²\n    = cos²α − 2cosαcosβ + cos²β\n      + sin²α − 2sinαsinβ + sin²β\n    = 2 − 2(cosαcosβ + sinαsinβ)",
+    highlight: "step3"
+  },
+  {
+    title: "두 식을 같다고 놓기 → cos(α−β)",
+    body: "②=③에서 cos(α−β) 공식을 얻습니다.",
+    detail: "2−2cos(α−β) = 2−2(cosαcosβ+sinαsinβ)\n\n∴ cos(α−β) = cosαcosβ + sinαsinβ  ①",
+    highlight: "step4"
+  },
+  {
+    title: "β → −β 대입 → cos(α+β)",
+    body: "①에서 β를 −β로 바꾸면 덧셈 공식이 나옵니다.",
+    detail: "cos(α+β) = cosαcos(−β) + sinαsin(−β)\n           = cosαcosβ − sinαsinβ  ②",
+    highlight: "step5"
+  },
+  {
+    title: "sin 덧셈 공식 유도",
+    body: "여각 관계 sin θ = cos(π/2−θ)를 이용합니다.",
+    detail: "sin(α+β) = cos(π/2−(α+β))\n           = cos((π/2−α)−β)\n           = cos(π/2−α)cosβ + sin(π/2−α)sinβ\n           = sinαcosβ + cosαsinβ  ③",
+    highlight: "step6"
+  }
+];
+
+let currentStep = 0;
+
+function buildSteps() {
+  const container = document.getElementById('steps');
+  container.innerHTML = '';
+  stepsData.forEach((s, i) => {
+    const d = document.createElement('div');
+    d.className = 'step' + (i === currentStep ? ' active' : '');
+    d.innerHTML = `<div class="step-num">단계 ${i+1}</div><div class="step-title">${s.title}</div><div class="step-body"><div style="margin-bottom:6px">${s.body}</div><pre style="font-family:var(--font-mono);font-size:11.5px;line-height:1.7;white-space:pre-wrap">${s.detail}</pre></div>`;
+    d.onclick = () => { currentStep = i; buildSteps(); draw(); updateNav(); };
+    container.appendChild(d);
+  });
+  const active = container.children[currentStep];
+  if (active) active.scrollIntoView({block:'nearest', behavior:'smooth'});
+}
+
+function updateNav() {
+  document.getElementById('btnPrev').disabled = currentStep === 0;
+  document.getElementById('btnNext').disabled = currentStep === stepsData.length - 1;
+}
+
+function prevStep() { if (currentStep > 0) { currentStep--; buildSteps(); draw(); updateNav(); } }
+function nextStep() { if (currentStep < stepsData.length - 1) { currentStep++; buildSteps(); draw(); updateNav(); } }
+
+function draw() {
+  const a = parseInt(document.getElementById('slA').value);
+  const b = parseInt(document.getElementById('slB').value);
+  document.getElementById('vA').textContent = a + '°';
+  document.getElementById('vB').textContent = b + '°';
+
+  const aR = a * Math.PI / 180;
+  const bR = b * Math.PI / 180;
+  const dR = (a - b) * Math.PI / 180;
+
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  const cx = W * 0.5, cy = H * 0.5;
+  const R = W * 0.38;
+
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const bg = dark ? '#1a1a18' : '#f5f4f0';
+  const fg = dark ? '#c2c0b6' : '#3d3d3a';
+  const fgDim = dark ? '#6a6860' : '#aaa8a0';
+  const blue = '#378ADD';
+  const coral = '#D85A30';
+  const green = '#1D9E75';
+  const amber = '#BA7517';
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = fgDim;
+  ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(20, cy); ctx.lineTo(W-20, cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx, 20); ctx.lineTo(cx, H-20); ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.strokeStyle = dark ? '#444440' : '#ccc9c0';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  const Px = cx + R * Math.cos(aR);
+  const Py = cy - R * Math.sin(aR);
+  const Qx = cx + R * Math.cos(bR);
+  const Qy = cy - R * Math.sin(bR);
+
+  if (currentStep >= 1) {
+    ctx.beginPath();
+    ctx.moveTo(Px, Py); ctx.lineTo(Qx, Qy);
+    ctx.strokeStyle = green;
+    ctx.lineWidth = currentStep >= 1 ? 1.5 : 0.5;
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const mx = (Px+Qx)/2, my = (Py+Qy)/2;
+    const dx = Qx-Px, dy = Qy-Py;
+    const len = Math.sqrt(dx*dx+dy*dy);
+    const ox = -dy/len * 10, oy = dx/len * 10;
+    ctx.font = '11px sans-serif';
+    ctx.fillStyle = green;
+    ctx.textAlign = 'center';
+    ctx.fillText('PQ', mx + ox, my + oy);
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(cx, cy); ctx.lineTo(Px, Py);
+  ctx.strokeStyle = coral;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(cx, cy); ctx.lineTo(Qx, Qy);
+  ctx.strokeStyle = blue;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  if (a > b) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.22, -bR, -aR, true);
+    ctx.strokeStyle = amber;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    const midA = (aR + bR) / 2;
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillStyle = amber;
+    ctx.textAlign = 'center';
+    ctx.fillText('α−β', cx + R * 0.27 * Math.cos(midA), cy - R * 0.27 * Math.sin(midA));
+  }
+
+  const arcR = R * 0.14;
+  ctx.beginPath();
+  ctx.arc(cx, cy, arcR, -aR, 0, true);
+  ctx.strokeStyle = coral;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.font = 'bold 12px sans-serif';
+  ctx.fillStyle = coral;
+  ctx.textAlign = 'left';
+  ctx.fillText('α', cx + arcR * Math.cos(-aR / 2) + 4, cy - arcR * Math.sin(-aR / 2) - 2);
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, arcR * 1.5, -bR, 0, true);
+  ctx.strokeStyle = blue;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = blue;
+  ctx.textAlign = 'left';
+  ctx.fillText('β', cx + arcR * 1.55 * Math.cos(-bR / 2) + 4, cy - arcR * 1.55 * Math.sin(-bR / 2) - 2);
+
+  ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fillStyle = fg; ctx.fill();
+  ctx.beginPath(); ctx.arc(Px, Py, 5, 0, Math.PI * 2); ctx.fillStyle = coral; ctx.fill();
+  ctx.beginPath(); ctx.arc(Qx, Qy, 5, 0, Math.PI * 2); ctx.fillStyle = blue; ctx.fill();
+
+  ctx.font = 'bold 13px sans-serif';
+  ctx.fillStyle = coral;
+  ctx.textAlign = Px > cx ? 'left' : 'right';
+  ctx.fillText('P', Px + (Px > cx ? 7 : -7), Py + (Py < cy ? -6 : 14));
+  ctx.fillStyle = blue;
+  ctx.textAlign = Qx > cx ? 'left' : 'right';
+  ctx.fillText('Q', Qx + (Qx > cx ? 7 : -7), Qy + (Qy < cy ? -6 : 14));
+  ctx.fillStyle = fgDim;
+  ctx.textAlign = 'left';
+  ctx.font = '11px sans-serif';
+  ctx.fillText('O', cx + 5, cy - 5);
+
+  if (currentStep >= 0) {
+    ctx.font = '10px sans-serif';
+    ctx.fillStyle = coral;
+    ctx.textAlign = Px > cx ? 'left' : 'right';
+    ctx.fillText('(cosα, sinα)', Px + (Px > cx ? 8 : -8), Py + (Py < cy ? -14 : 22));
+    ctx.fillStyle = blue;
+    ctx.textAlign = Qx > cx ? 'left' : 'right';
+    ctx.fillText('(cosβ, sinβ)', Qx + (Qx > cx ? 8 : -8), Qy + (Qy < cy ? -14 : 22));
+  }
+
+  const cosAminB = Math.cos(aR - bR);
+  const sinAplusB = Math.sin(aR + bR);
+  const cosAplusB = Math.cos(aR + bR);
+  const sinAminB = Math.sin(aR - bR);
+
+  document.getElementById('results').innerHTML = `
+    <div class="result-card">
+      <div class="result-label">cos(α−β)</div>
+      <div class="result-val">${cosAminB.toFixed(4)}</div>
+    </div>
+    <div class="result-card">
+      <div class="result-label">cosαcosβ + sinαsinβ</div>
+      <div class="result-val">${(Math.cos(aR)*Math.cos(bR)+Math.sin(aR)*Math.sin(bR)).toFixed(4)}</div>
+    </div>
+    <div class="result-card">
+      <div class="result-label">cos(α+β)</div>
+      <div class="result-val">${cosAplusB.toFixed(4)}</div>
+    </div>
+    <div class="result-card">
+      <div class="result-label">cosαcosβ − sinαsinβ</div>
+      <div class="result-val">${(Math.cos(aR)*Math.cos(bR)-Math.sin(aR)*Math.sin(bR)).toFixed(4)}</div>
+    </div>
+  `;
+
+  document.getElementById('finalBox').innerHTML = `
+    <div style="font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:6px">완성된 덧셈 공식 (수치 확인 — 두 값이 같으면 공식 성립)</div>
+    <div class="formula">
+      <span class="hi3">cos(α−β)</span> = cosα·cosβ + sinα·sinβ<br>
+      <span class="hi3">cos(α+β)</span> = cosα·cosβ − sinα·sinβ<br>
+      <span class="hi">sin(α+β)</span> = sinα·cosβ + cosα·sinβ<br>
+      <span class="hi">sin(α−β)</span> = sinα·cosβ − cosα·sinβ
+    </div>
+  `;
+}
+
+buildSteps();
+draw();
+updateNav();
+</script>
